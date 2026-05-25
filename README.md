@@ -151,15 +151,3 @@ cinematch/
 ```
 
 ---
-
-## Resume Talking Points
-
-- **Prompt Engineering**: Two distinct AI prompt strategies — structured (quiz → JSON recommendations) vs conversational (multi-turn chat with session history)
-- **API Orchestration**: Claude API + TMDB API responses combined in a single backend response
-- **Session Management**: Express sessions maintain 20-message rolling chat history
-- **React Architecture**: Multi-page SPA with React Router, component reuse (MovieCard, Nav)
-- **Full Stack Deployment**: Separate frontend (Vercel) + backend (Render) deployment with CORS configuration
-
----
-
-Built with ❤️ using Claude API + TMDB
