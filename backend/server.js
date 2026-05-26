@@ -424,6 +424,23 @@ const GENRE_IDS = {
   'Thriller': 53, 'War': 10752
 };
 
+// Language display name → ISO 639-1 code (matches frontend LANGUAGES array)
+const LANGUAGE_CODES = {
+  'English': 'en', 'Hindi': 'hi', 'Korean': 'ko', 'French': 'fr',
+  'Spanish': 'es', 'Japanese': 'ja', 'Italian': 'it', 'German': 'de',
+  'Tamil': 'ta', 'Telugu': 'te'
+};
+
+// Streaming platform display name → TMDB watch provider ID (region: IN)
+const STREAMING_IDS = {
+  'Netflix':       '8',
+  'Amazon Prime':  '119',
+  'Disney+':       '2336',   // JioHotstar (formerly Disney+ Hotstar, rebranded Feb 2025)
+  'Apple TV+':     '350',
+  'Mubi':          '11',
+  'ZEE5':          '232'
+};
+
 const SECTION_DEFS = {
   trending:       { title: '🔥 Trending This Week',       endpoint: 'trending/movie/week', params: {} },
   fan_favourites: { title: '❤️ Fan Favourites',           endpoint: 'movie/popular',       params: {} },
