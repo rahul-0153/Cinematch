@@ -178,15 +178,23 @@ app.get('/api/foryou', authMiddleware, async (req, res) => {
       return res.json({ movies: [], message: 'Watch at least 3 movies to get personalized recommendations' });
     }
 
-    const historyText = history.map(m => `- ${m.title} (${m.release_year}) [${m.genres?.join(', ')}]`).join('\n');
+    // Titles to exclude: watch history + already recommended (sent by frontend as ||-separated string)
+    const excludeParam = req.query.exclude || '';
+    const excludedByFrontend = excludeParam ? excludeParam.split('||') : [];
+    const watchedTitles = history.map(m => m.title);
+    const allExcluded = [...new Set([...watchedTitles, ...excludedByFrontend])];
 
-    const prompt = `You are a world-class film curator. Based on this user's watch history, recommend 6 movies they haven't seen yet.
+    const historyText = history.map(m => `- ${m.title} (${m.release_year}) [${m.genres?.join(', ')}]`).join('\n');
+    const excludeText = allExcluded.length
+      ? `\n\nDo NOT recommend any of these (already watched or already recommended):\n${allExcluded.map(t => `- ${t}`).join('\n')}`
+      : '';
+
+    const prompt = `You are a world-class film curator. Based on this user's watch history, recommend exactly 10 movies they haven't seen yet.
 
 Watch history:
-${historyText}
+${historyText}${excludeText}
 
-Analyze their taste patterns (genres, eras, tone) and recommend movies that match their preferences but they likely haven't watched.
-Do NOT recommend any movie already in their watch history.
+Analyze their taste patterns (genres, eras, tone, directors) and recommend fresh movies. Be diverse — mix different genres, eras, and languages that still fit their taste. Every call should surface different films.
 
 Respond ONLY with a valid JSON array, no markdown:
 [
@@ -196,20 +204,22 @@ Respond ONLY with a valid JSON array, no markdown:
     "director": "Director Name",
     "cast": ["Actor 1", "Actor 2"],
     "genres": ["Genre1", "Genre2"],
-    "why": "1-2 sentence explanation of why this matches their specific taste based on what they've watched",
+    "why": "1-2 sentence explanation tied to what they've watched",
     "mood_tags": ["tag1", "tag2"]
   }
 ]`;
 
     const message = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
-      max_tokens: 2000,
+      max_tokens: 3000,
       messages: [{ role: 'user', content: prompt }]
     });
 
     let raw = message.choices[0].message.content.trim().replace(/```json|```/g, '').trim();
     const movies = JSON.parse(raw);
-    const enriched = await enrichMovies(movies);
+    const lower = allExcluded.map(t => t.toLowerCase());
+    const unique = movies.filter(m => !lower.includes(m.title.toLowerCase()));
+    const enriched = await enrichMovies(unique);
     res.json({ movies: enriched });
   } catch (err) {
     console.error('ForYou error:', err);
@@ -220,8 +230,12 @@ Respond ONLY with a valid JSON array, no markdown:
 // ─── WATCH WITH ROUTE ─────────────────────────────────────────────────────────
 
 app.post('/api/watchwith', async (req, res) => {
-  const { person1, person2 } = req.body;
+  const { person1, person2, exclude = [] } = req.body;
   if (!person1 || !person2) return res.status(400).json({ error: 'Both profiles required' });
+
+  const excludeText = exclude.length
+    ? `\n\nDo NOT recommend any of these (already suggested):\n${exclude.map(t => `- ${t}`).join('\n')}`
+    : '';
 
   const prompt = `You are a movie matchmaker. Two people want to watch a movie together but have different tastes. Find 5 perfect compromise movies both will enjoy.
 
@@ -235,9 +249,9 @@ Person 2 (${person2.name}):
 - Favourite genres: ${person2.genres}
 - Favourite movies: ${person2.movies}
 - Mood tonight: ${person2.mood}
-- Avoid: ${person2.avoid || 'nothing specific'}
+- Avoid: ${person2.avoid || 'nothing specific'}${excludeText}
 
-Find movies that genuinely satisfy BOTH people. Be creative — find the real overlap.
+Find movies that genuinely satisfy BOTH people. Be creative — find the real overlap. Every call should surface different films.
 
 Respond ONLY with valid JSON, no markdown:
 [
@@ -257,13 +271,15 @@ Respond ONLY with valid JSON, no markdown:
   try {
     const message = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
-      max_tokens: 2000,
+      max_tokens: 2500,
       messages: [{ role: 'user', content: prompt }]
     });
 
     let raw = message.choices[0].message.content.trim().replace(/```json|```/g, '').trim();
     const movies = JSON.parse(raw);
-    const enriched = await enrichMovies(movies);
+    const lower = exclude.map(t => t.toLowerCase());
+    const unique = movies.filter(m => !lower.includes(m.title.toLowerCase()));
+    const enriched = await enrichMovies(unique);
     res.json({ movies: enriched });
   } catch (err) {
     console.error('WatchWith error:', err);
@@ -318,14 +334,19 @@ app.post('/api/chat', async (req, res) => {
   req.session.chatHistory.push({ role: 'user', content: message });
 
   const systemPrompt = `You are CineMatch, an expert movie recommendation assistant with encyclopedic knowledge of cinema.
-When recommending movies, ALWAYS respond with valid JSON:
-{"reply": "Your conversational response", "movies": [{"title":"","year":0,"director":"","cast":[],"genres":[],"why":"","mood_tags":[]}]}
-If not recommending, set "movies" to []. No markdown, pure JSON only.`;
+ALWAYS respond with valid JSON — no markdown, no extra text, pure JSON only:
+{"reply": "Your conversational response here", "movies": [...]}
+
+Rules for movies:
+- When recommending, ALWAYS return EXACTLY 4 movies — no more, no less.
+- If the user asks for more or says "more like that", return 4 NEW movies not previously mentioned.
+- If not recommending (e.g. answering a question), set "movies" to [].
+- Each movie must have: title, year (number), director, cast (array), genres (array), why (1 sentence reason), mood_tags (array).`;
 
   try {
     const message_obj = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
-      max_tokens: 2000,
+      max_tokens: 2500,
       messages: [{ role: 'system', content: systemPrompt }, ...req.session.chatHistory]
     });
     const rawText = message_obj.choices[0].message.content.trim().replace(/```json|```/g, '').trim();
