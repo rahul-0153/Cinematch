@@ -26,7 +26,13 @@ export default function ForYou() {
     append ? setLoadingMore(true) : setLoading(true)
 
     try {
-      const res = await fetch(`${API}/api/foryou`, {
+      // Send already-seen titles so the backend (and AI) avoids repeating them
+      const exclude = [...seenTitles.current].join('||')
+      const url = exclude
+        ? `${API}/api/foryou?exclude=${encodeURIComponent(exclude)}`
+        : `${API}/api/foryou`
+
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       })
       const data = await res.json()
@@ -37,7 +43,7 @@ export default function ForYou() {
         return
       }
 
-      // Filter out already shown movies
+      // Dedupe on frontend as safety net
       const newMovies = (data.movies || []).filter(m => !seenTitles.current.has(m.title))
       newMovies.forEach(m => seenTitles.current.add(m.title))
       setMovies(prev => append ? [...prev, ...newMovies] : newMovies)

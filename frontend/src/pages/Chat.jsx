@@ -104,16 +104,44 @@ export default function Chat() {
                 </div>
               </div>
 
-              {/* Movie grid — auto-fit, shows all movies AI returns */}
+              {/* Movie grid — always 4 per row */}
               {msg.movies?.length > 0 && (
                 <div style={{ marginTop: 16, marginLeft: 42 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 16 }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    gap: 12
+                  }}>
                     {msg.movies.map((movie, mi) => (
-                      <div key={movie.title + mi} onClick={() => movie.tmdb_id && setSelectedId(movie.tmdb_id)} style={{ cursor: movie.tmdb_id ? 'pointer' : 'default' }}>
-                        <MovieCard movie={movie} index={mi} />
+                      <div key={movie.title + mi} onClick={() => movie.tmdb_id && setSelectedId(movie.tmdb_id)}
+                        style={{ cursor: movie.tmdb_id ? 'pointer' : 'default', display: 'flex', flexDirection: 'column' }}>
+                        {/* Poster */}
+                        <div style={{ borderRadius: 10, overflow: 'hidden', aspectRatio: '2/3', background: 'var(--surface2)', flexShrink: 0 }}>
+                          {movie.poster
+                            ? <img src={movie.poster} alt={movie.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>🎬</div>
+                          }
+                        </div>
+                        {/* Info */}
+                        <div style={{ padding: '8px 4px' }}>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600, lineHeight: 1.3, marginBottom: 3, color: 'var(--text)' }}>{movie.title}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{movie.year}{movie.director ? ` · ${movie.director}` : ''}</div>
+                          {movie.why && <div style={{ fontSize: 11, color: 'var(--muted2)', lineHeight: 1.4 }}>{movie.why}</div>}
+                        </div>
                       </div>
                     ))}
                   </div>
+                  {/* More like this */}
+                  {msg.role === 'assistant' && msg.movies?.length > 0 && i === messages.length - 1 && (
+                    <button onClick={() => send('Give me 4 more movies like these')}
+                      style={{ marginTop: 12, fontSize: 12, padding: '7px 16px', background: 'transparent',
+                        border: '1px solid var(--border)', borderRadius: 100, color: 'var(--muted)',
+                        cursor: 'pointer', fontFamily: 'var(--font-body)', transition: 'all 0.15s' }}
+                      onMouseEnter={e => { e.target.style.borderColor = 'var(--gold)'; e.target.style.color = 'var(--gold)' }}
+                      onMouseLeave={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.color = 'var(--muted)' }}>
+                      ✨ More like these
+                    </button>
+                  )}
                 </div>
               )}
 

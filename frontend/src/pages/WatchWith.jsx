@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Nav from '../components/Nav'
 import MovieCard from '../components/MovieCard'
 import MovieModal from '../components/MovieModal'
@@ -77,29 +77,41 @@ export default function WatchWith() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [selectedId, setSelectedId] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const seenTitles = useRef(new Set())
 
-  async function findMovies() {
+  async function findMovies(append = false) {
     if (!person1.name || !person2.name) return setError('Both names are required')
     if (!person1.genres.length || !person2.genres.length) return setError('Both people need to pick at least one genre')
     if (!person1.mood || !person2.mood) return setError('Both people need to pick a mood')
     setError('')
-    setLoading(true)
+    if (!append) {
+      seenTitles.current = new Set()
+      setLoading(true)
+    } else {
+      setLoadingMore(true)
+    }
     try {
+      const exclude = [...seenTitles.current]
       const res = await fetch(`${API}/api/watchwith`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           person1: { ...person1, genres: person1.genres.join(', ') },
-          person2: { ...person2, genres: person2.genres.join(', ') }
+          person2: { ...person2, genres: person2.genres.join(', ') },
+          exclude
         })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setMovies(data.movies)
+      const newMovies = (data.movies || []).filter(m => !seenTitles.current.has(m.title))
+      newMovies.forEach(m => seenTitles.current.add(m.title))
+      setMovies(prev => append ? [...prev, ...newMovies] : newMovies)
     } catch (e) {
       setError(e.message)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
 
@@ -188,6 +200,16 @@ export default function WatchWith() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Load More */}
+            <div style={{ textAlign: 'center', marginTop: 40 }}>
+              <button className="btn btn-ghost" onClick={() => findMovies(true)} disabled={loadingMore} style={{ padding: '12px 32px', fontSize: 14 }}>
+                {loadingMore
+                  ? <><span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Finding more...</>
+                  : '✨ Load More Picks'
+                }
+              </button>
             </div>
           </div>
         )}
